@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Macron 3D - Scène Interactive avec Public en Délire</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            z-index: 100;
+        }
+        #info h1 {
+            margin: 0 0 10px 0;
+            color: #FFD700;
+            font-size: 24px;
+        }
+        #info p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+            text-align: center;
+            background: rgba(0,0,0,0.8);
+            padding: 40px;
+            border-radius: 20px;
+            z-index: 1000;
+        }
+        .controls-info {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Chargement de la scène 3D...<br><small>Création des personnages et des confettis...</small></div>
+    
+    <div id="info">
+        <h1>🎤 Macron en 3D !</h1>
+        <p>👋 Fait coucou comme un maneki-neko</p>
+        <p>👥 Public en délire</p>
+        <p>✨ Confettis</p>
+    </div>
+    
+    <div class="controls-info">
+        🖱️ <strong>CONTRÔLES :</strong> Clic + glisser = tourner | Molette = zoomer | Clic droit = déplacer
+    </div>
+    
+    <!-- Three.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls for camera -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <script>
+        // ============================================================================
+        // CONFIGURATION DE LA SCÈNE
+        // ============================================================================
+        
+        let scene, camera, renderer, controls;
+        let macron, publicGroup, confettiGroup;
+        let clock = new THREE.Clock();
+        
+        // Initialisation
+        function init() {
+            // Créer la scène
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.Fog(0x87CEEB, 50, 200);
+            
+            // Créer la caméra
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 15, 30);
+            camera.lookAt(0, 5, 0);
+            
+            // Créer le renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+            
+            // Ajouter les contrôles de caméra
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 10;
+            controls.maxDistance = 100;
+            controls.maxPolarAngle = Math.PI * 0.9;
+            
+            // Ajouter la lumière
+            addLights();
+            
+            // Créer le sol (estrade)
+            createFloor();
+            
+            // Créer le pupitre
+            createPupitre();
+            
+            // Créer Macron
+            macron = createMacron();
+            scene.add(macron);
+            
+            // Créer le public
+            publicGroup = new THREE.Group();
+            createPublic();
+            scene.add(publicGroup);
+            
+            // Créer les confettis
+            confettiGroup = new THREE.Group();
+            createConfetti();
+            scene.add(confettiGroup);
+            
+            // Ajouter le drapeau français
+            createDrapeau();
+            
+            // Ajouter un fond
+            createBackground();
+            
+            // Masquer le chargement
+            document.getElementById('loading').style.display = 'none';
+            
+            // Démarrer l'animation
+            animate();
+        }
+        
+        // ============================================================================
+        // LUMIÈRES
+        // ============================================================================
+        
+        function addLights() {
+            // Lumière principale (soleil)
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(20, 30, 20);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 200;
+            directionalLight.shadow.camera.left = -50;
+            directionalLight.shadow.camera.right = 50;
+            directionalLight.shadow.camera.top = 50;
+            directionalLight.shadow.camera.bottom = -50;
+            scene.add(directionalLight);
+            
+            // Lumière ambiante
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+            scene.add(ambientLight);
+            
+            // Lumière de remplissage
+            const fillLight = new THREE.PointLight(0x87CEEB, 0.8);
+            fillLight.position.set(-20, 20, -20);
+            scene.add(fillLight);
+            
+            // Lumière arrière (pour les contours)
+            const backLight = new THREE.PointLight(0xffffff, 0.5);
+            backLight.position.set(0, 10, -30);
+            scene.add(backLight);
+        }
+        
+        // ============================================================================
+        // SOL (ESTRADE)
+        // ============================================================================
+        
+        function createFloor() {
+            const geometry = new THREE.BoxGeometry(100, 0.5, 50);
+            const material = new THREE.MeshStandardMaterial({ 
+                color: 0x5C4033,
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            const floor = new THREE.Mesh(geometry, material);
+            floor.position.y = -0.25;
+            floor.receiveShadow = true;
+            scene.add(floor);
+            
+            // Ajouter des détails au sol (lignes)
+            for (let i = -40; i <= 40; i += 5) {
+                const lineGeometry = new THREE.BoxGeometry(0.1, 0.05, 40);
+                const lineMaterial = new THREE.MeshStandardMaterial({ color: 0x3a2a1a });
+                const line = new THREE.Mesh(lineGeometry, lineMaterial);
+                line.position.set(i, -0.2, 0);
+                scene.add(line);
+            }
+        }
+        
+        // ============================================================================
+        // PUPITRE PRÉSIDENTIEL
+        // ============================================================================
+        
+        function createPupitre() {
+            const group = new THREE.Group();
+            
+            // Surface du pupitre
+            const surfaceGeometry = new THREE.BoxGeometry(4, 0.2, 2);
+            const surfaceMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x1a120b,
+                roughness: 0.4,
+                metalness: 0.3
+            });
+            const surface = new THREE.Mesh(surfaceGeometry, surfaceMaterial);
+            surface.position.set(0, 3, -2);
+            surface.castShadow = true;
+            surface.receiveShadow = true;
+            group.add(surface);
+            
+            // Bords dorés
+            const bordGeometry = new THREE.BoxGeometry(4.2, 0.1, 2.2);
+            const bordMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xD4AF37,
+                roughness: 0.2,
+                metalness: 0.8
+            });
+            const bord = new THREE.Mesh(bordGeometry, bordMaterial);
+            bord.position.set(0, 3.15, -2);
+            group.add(bord);
+            
+            // Pieds du pupitre (4 pieds)
+            const piedGeometry = new THREE.BoxGeometry(0.2, 3, 0.2);
+            const piedMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x1a120b,
+                roughness: 0.4
+            });
+            
+            const piedPositions = [
+                [-1.6, 1.5, -1.6],
+                [1.6, 1.5, -1.6],
+                [-1.6, 1.5, -2.4],
+                [1.6, 1.5, -2.4]
+            ];
+            
+            piedPositions.forEach(pos => {
+                const pied = new THREE.Mesh(piedGeometry, piedMaterial);
+                pied.position.set(pos[0], pos[1], pos[2]);
+                pied.castShadow = true;
+                group.add(pied);
+            });
+            
+            // Microphones (3 micros)
+            for (let i = 0; i < 3; i++) {
+                const micGroup = new THREE.Group();
+                
+                // Tige du micro
+                const tigeGeometry = new THREE.CylinderGeometry(0.05, 0.05, 1.5, 16);
+                const tigeMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0xC0C0C0,
+                    metalness: 0.9,
+                    roughness: 0.1
+                });
+                const tige = new THREE.Mesh(tigeGeometry, tigeMaterial);
+                tige.position.y = 1.5 / 2;
+                tige.castShadow = true;
+                micGroup.add(tige);
+                
+                // Grille du micro
+                const grilleGeometry = new THREE.SphereGeometry(0.15, 16, 16);
+                const grilleMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x808080,
+                    metalness: 0.7,
+                    roughness: 0.3,
+                    wireframe: true
+                });
+                const grille = new THREE.Mesh(grilleGeometry, grilleMaterial);
+                grille.position.y = 1.5;
+                micGroup.add(grille);
+                
+                micGroup.position.set(-1 + i, 3.2, -2);
+                group.add(micGroup);
+            }
+            
+            // Logo RF sur le pupitre
+            const logoGeometry = new THREE.BoxGeometry(0.8, 0.4, 0.1);
+            const logoMaterial = new THREE.MeshStandardMaterial({ color: 0x002395 });
+            const logo = new THREE.Mesh(logoGeometry, logoMaterial);
+            logo.position.set(0, 3.25, -1.5);
+            group.add(logo);
+            
+            scene.add(group);
+        }
+        
+        // ============================================================================
+        // MACRON (modèle ultra-détaillé)
+        // ============================================================================
+        
+        function createMacron() {
+            const group = new THREE.Group();
+            group.position.set(0, 0, -2);
+            
+            // PIEDS (chaussures noires)
+            const footGeometry = new THREE.BoxGeometry(0.3, 0.1, 0.6);
+            const footMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x000000,
+                roughness: 0.8
+            });
+            
+            const leftFoot = new THREE.Mesh(footGeometry, footMaterial);
+            leftFoot.position.set(-0.2, 0, 0);
+            leftFoot.castShadow = true;
+            group.add(leftFoot);
+            
+            const rightFoot = new THREE.Mesh(footGeometry, footMaterial);
+            rightFoot.position.set(0.2, 0, 0);
+            rightFoot.castShadow = true;
+            group.add(rightFoot);
+            
+            // JAMBES (pantalon bleu)
+            const legGeometry = new THREE.CylinderGeometry(0.15, 0.12, 1.8, 16);
+            const legMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x002395,
+                roughness: 0.6
+            });
+            
+            const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+            leftLeg.position.set(-0.2, 0.9, 0);
+            leftLeg.rotation.x = Math.PI * 0.05;
+            leftLeg.castShadow = true;
+            group.add(leftLeg);
+            
+            const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+            rightLeg.position.set(0.2, 0.9, 0);
+            rightLeg.rotation.x = -Math.PI * 0.05;
+            rightLeg.castShadow = true;
+            group.add(rightLeg);
+            
+            // CORPS (costume bleu)
+            const bodyGeometry = new THREE.CylinderGeometry(0.35, 0.3, 1.2, 16);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x002395,
+                roughness: 0.6
+            });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 2.1;
+            body.castShadow = true;
+            group.add(body);
+            
+            // CHEMISE (blanche, visible au col)
+            const shirtGeometry = new THREE.CylinderGeometry(0.3, 0.28, 0.3, 16);
+            const shirtMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xFFFFFF,
+                roughness: 0.7
+            });
+            const shirt = new THREE.Mesh(shirtGeometry, shirtMaterial);
+            shirt.position.y = 2.9;
+            shirt.castShadow = true;
+            group.add(shirt);
+            
+            // CRAVATE (jaune doré)
+            const tieGeometry = new THREE.ConeGeometry(0.08, 0.4, 8);
+            const tieMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xFFD700,
+                roughness: 0.3,
+                metalness: 0.5
+            });
+            const tie = new THREE.Mesh(tieGeometry, tieMaterial);
+            tie.position.set(0, 2.6, -0.1);
+            tie.rotation.x = Math.PI * 0.3;
+            tie.castShadow = true;
+            group.add(tie);
+            
+            // NŒUD DE CRAVATE
+            const knotGeometry = new THREE.SphereGeometry(0.1, 16, 16);
+            const knotMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x8B4513,
+                roughness: 0.5
+            });
+            const knot = new THREE.Mesh(knotGeometry, knotMaterial);
+            knot.position.set(0, 2.85, -0.1);
+            knot.castShadow = true;
+            group.add(knot);
+            
+            // COU (pour la connexion tête/corps)
+            const neckGeometry = new THREE.CylinderGeometry(0.12, 0.1, 0.2, 16);
+            const neckMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xFFE4C4,
+                roughness: 0.8
+            });
+            const neck = new THREE.Mesh(neckGeometry, neckMaterial);
+            neck.position.y = 3.1;
+            neck.castShadow = true;
+            group.add(neck);
+            
+            // TÊTE (exagérément grande pour la caricature)
+            const headGroup = new THREE.Group();
+            headGroup.position.y = 3.5;
+            
+            // Tête (sphère)
+            const headGeometry = new THREE.SphereGeometry(0.45, 32, 32);
+            const headMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xFFE4C4,
+                roughness: 0.8,
+                map: createSkinTexture()
+            });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.castShadow = true;
+            headGroup.add(head);
+            
+            // CHEVEUX (style Macron très caractéristique)
+            const hairGeometry = new THREE.SphereGeometry(0.48, 32, 32, 0, Math.PI * 2, 0, Math.PI * 0.5);
+            const hairMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x1a120b,
+                roughness: 0.7,
+                side: THREE.DoubleSide
+            });
+            const hair = new THREE.Mesh(hairGeometry, hairMaterial);
+            hair.position.y = 0.1;
+            hair.castShadow = true;
+            headGroup.add(hair);
+            
+            // VISAGE (détails)
+            createFace(headGroup);
+            
+            group.add(headGroup);
+            
+            // BRAS
+            createArms(group);
+            
+            return group;
+        }
+        
+        // ============================================================================
+        // VISAGE DE MACRON
+        // ============================================================================
+        
+        function createFace(headGroup) {
+            // YEUX (exagérés)
+            const eyeGeometry = new THREE.SphereGeometry(0.08, 16, 16);
+            const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+            
+            for (let side of [-1, 1]) {
+                const eye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+                eye.position.set(side * 0.18, 0.05, 0.25);
+                headGroup.add(eye);
+                
+                // Pupille (brillante)
+                const pupilGeometry = new THREE.SphereGeometry(0.03, 16, 16);
+                const pupilMaterial = new THREE.MeshStandardMaterial({ color: 0xFFFFFF });
+                const pupil = new THREE.Mesh(pupilleGeometry, pupilMaterial);
+                pupil.position.set(side * 0.18 + 0.02, 0.05, 0.28);
+                headGroup.add(pupil);
+                
+                // Reflet dans l'œil
+                const refletGeometry = new THREE.SphereGeometry(0.01, 16, 16);
+                const refletMaterial = new THREE.MeshStandardMaterial({ color: 0xFFFFFF });
+                const reflet = new THREE.Mesh(refletGeometry, refletMaterial);
+                reflet.position.set(side * 0.18 + 0.03, 0.06, 0.29);
+                headGroup.add(reflet);
+                
+                // SOURCILS (épais et expressifs)
+                const browGeometry = new THREE.BoxGeometry(0.15, 0.03, 0.02);
+                const browMaterial = new THREE.MeshStandardMaterial({ color: 0x1a120b });
+                const brow = new THREE.Mesh(browGeometry, browMaterial);
+                brow.position.set(side * 0.16, 0.12, 0.28);
+                brow.rotation.z = side * 0.2;
+                headGroup.add(brow);
+            }
+            
+            // NEZ (très caractéristique de Macron)
+            const noseGeometry = new THREE.ConeGeometry(0.06, 0.2, 8);
+            const noseMaterial = new THREE.MeshStandardMaterial({ color: 0xD2B48C });
+            const nose = new THREE.Mesh(noseGeometry, noseMaterial);
+            nose.position.set(0, -0.05, 0.3);
+            nose.rotation.x = Math.PI * 0.3;
+            headGroup.add(nose);
+            
+            // BOUCHE (sourire caractéristique)
+            const mouthGeometry = new THREE.TorusGeometry(0.12, 0.03, 8, 16);
+            const mouthMaterial = new THREE.MeshStandardMaterial({ color: 0x8B0000 });
+            const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
+            mouth.position.set(0, -0.15, 0.25);
+            mouth.rotation.x = Math.PI * 1.5;
+            headGroup.add(mouth);
+            
+            // OREILLES
+            const earGeometry = new THREE.SphereGeometry(0.06, 16, 16, 0, Math.PI, 0, Math.PI);
+            const earMaterial = new THREE.MeshStandardMaterial({ color: 0xFFE4C4 });
+            
+            for (let side of [-1, 1]) {
+                const ear = new THREE.Mesh(earGeometry, earMaterial);
+                ear.position.set(side * 0.25, -0.05, 0);
+                ear.rotation.y = side * Math.PI * 0.5;
+                headGroup.add(ear);
+            }
+        }
+        
+        // ============================================================================
+        // BRAS DE MACRON (avec animation)
+        // ============================================================================
+        
+        function createArms(group) {
+            // Bras gauche (fixe, le long du corps)
+            const leftArmGroup = new THREE.Group();
+            
+            // Haut du bras
+            const upperArmGeometry = new THREE.CylinderGeometry(0.08, 0.07, 0.8, 16);
+            const upperArmMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x002395,
+                roughness: 0.6
+            });
+            const upperArm = new THREE.Mesh(upperArmGeometry, upperArmMaterial);
+            upperArm.position.y = 0.4;
+            upperArm.rotation.z = Math.PI * 0.2;
+            upperArm.castShadow = true;
+            leftArmGroup.add(upperArm);
+            
+            // Avant-bras
+            const forearmGeometry = new THREE.CylinderGeometry(0.07, 0.06, 0.7, 16);
+            const forearm = new THREE.Mesh(forearmGeometry, upperArmMaterial);
+            forearm.position.y = -0.4;
+            forearm.rotation.z = Math.PI * 0.1;
+            forearm.castShadow = true;
+            leftArmGroup.add(forearm);
+            
+            // Main gauche
+            const handGeometry = new THREE.SphereGeometry(0.06, 16, 16);
+            const handMaterial = new THREE.MeshStandardMaterial({ color: 0xFFE4C4 });
+            const hand = new THREE.Mesh(handGeometry, handMaterial);
+            hand.position.y = -0.8;
+            hand.castShadow = true;
+            leftArmGroup.add(hand);
+            
+            leftArmGroup.position.set(-0.35, 2.8, 0);
+            group.add(leftArmGroup);
+            
+            // Bras droit (ANIMÉ)
+            macron.rightArm = new THREE.Group();
+            
+            // Haut du bras
+            const rightUpperArm = new THREE.Mesh(upperArmGeometry, upperArmMaterial);
+            rightUpperArm.position.y = 0.4;
+            rightUpperArm.rotation.z = -Math.PI * 0.2;
+            rightUpperArm.castShadow = true;
+            macron.rightArm.add(rightUpperArm);
+            
+            // Avant-bras
+            const rightForearm = new THREE.Mesh(forearmGeometry, upperArmMaterial);
+            rightForearm.position.y = -0.4;
+            rightForearm.castShadow = true;
+            macron.rightArm.add(rightForearm);
+            
+            // Main droite
+            const rightHand = new THREE.Mesh(handGeometry, handMaterial);
+            rightHand.position.y = -0.8;
+            rightHand.castShadow = true;
+            macron.rightArm.add(rightHand);
+            
+            macron.rightArm.position.set(0.35, 2.8, 0);
+            group.add(macron.rightArm);
+            
+            // Stocker la référence pour l'animation
+            macron.leftArm = leftArmGroup;
+        }
+        
+        // ============================================================================
+        // PUBLIC EN DÉLIRE
+        // ============================================================================
+        
+        function createPublic() {
+            const personCount = 20;
+            const colors = [0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00, 0xFF00FF, 0x00FFFF];
+            
+            for (let i = 0; i < personCount; i++) {
+                const personGroup = new THREE.Group();
+                
+                // Position aléatoire autour de la scène
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 10 + Math.random() * 15;
+                const x = Math.cos(angle) * distance;
+                const z = Math.sin(angle) * distance;
+                const y = 0;
+                
+                personGroup.position.set(x, y, z);
+                personGroup.rotation.y = angle + Math.PI;
+                
+                // Corps
+                const bodyGeometry = new THREE.CylinderGeometry(0.15, 0.12, 0.8, 8);
+                const bodyMaterial = new THREE.MeshStandardMaterial({ 
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    roughness: 0.7
+                });
+                const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+                body.position.y = 0.4;
+                body.castShadow = true;
+                personGroup.add(body);
+                
+                // Tête
+                const headGeometry = new THREE.SphereGeometry(0.12, 16, 16);
+                const headMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0xFFE4C4,
+                    roughness: 0.8
+                });
+                const head = new THREE.Mesh(headGeometry, headMaterial);
+                head.position.y = 0.85;
+                head.castShadow = true;
+                personGroup.add(head);
+                
+                // Cheveux
+                const hairGeometry = new THREE.SphereGeometry(0.13, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.5);
+                const hairMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x1a120b,
+                    roughness: 0.7,
+                    side: THREE.DoubleSide
+                });
+                const hair = new THREE.Mesh(hairGeometry, hairMaterial);
+                hair.position.set(0, 0.95, 0);
+                personGroup.add(hair);
+                
+                // Bras (pour l'animation)
+                const armGeometry = new THREE.CylinderGeometry(0.04, 0.03, 0.5, 8);
+                const armMaterial = new THREE.MeshStandardMaterial({ 
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    roughness: 0.7
+                });
+                
+                // Bras gauche
+                const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+                leftArm.position.set(-0.15, 0.7, 0);
+                leftArm.rotation.z = Math.PI * 0.3;
+                personGroup.add(leftArm);
+                
+                // Bras droit
+                const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+                rightArm.position.set(0.15, 0.7, 0);
+                rightArm.rotation.z = -Math.PI * 0.3;
+                personGroup.add(rightArm);
+                
+                // Jambes
+                const legGeometry = new THREE.CylinderGeometry(0.06, 0.05, 0.6, 8);
+                const legMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x000080,
+                    roughness: 0.7
+                });
+                
+                const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+                leftLeg.position.set(-0.08, 0.2, 0);
+                personGroup.add(leftLeg);
+                
+                const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+                rightLeg.position.set(0.08, 0.2, 0);
+                personGroup.add(rightLeg);
+                
+                // Stocker les références pour l'animation
+                personGroup.userData = {
+                    originalY: 0,
+                    jumpPhase: Math.random() * Math.PI * 2,
+                    jumpSpeed: 0.05 + Math.random() * 0.1,
+                    armPhase: Math.random() * Math.PI * 2,
+                    armSpeed: 0.1 + Math.random() * 0.2,
+                    leftArm: leftArm,
+                    rightArm: rightArm,
+                    body: body
+                };
+                
+                publicGroup.add(personGroup);
+            }
+        }
+        
+        // ============================================================================
+        // CONFETTIS
+        // ============================================================================
+        
+        function createConfetti() {
+            const confettiCount = 200;
+            const colors = [0x002395, 0xFFFFFF, 0xED2939]; // Bleu, blanc, rouge
+            
+            for (let i = 0; i < confettiCount; i++) {
+                const geometry = new THREE.BoxGeometry(0.05, 0.05, 0.01);
+                const material = new THREE.MeshStandardMaterial({ 
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    roughness: 0.3,
+                    metalness: 0.3
+                });
+                const confetti = new THREE.Mesh(geometry, material);
+                
+                // Position initiale aléatoire
+                confetti.position.set(
+                    (Math.random() - 0.5) * 40,
+                    10 + Math.random() * 20,
+                    (Math.random() - 0.5) * 40
+                );
+                
+                // Vitesse de chute aléatoire
+                confetti.userData = {
+                    speedY: -0.05 - Math.random() * 0.05,
+                    speedX: (Math.random() - 0.5) * 0.02,
+                    speedZ: (Math.random() - 0.5) * 0.02,
+                    rotationSpeed: Math.random() * 0.1
+                };
+                
+                confettiGroup.add(confetti);
+            }
+        }
+        
+        // ============================================================================
+        // DRAPEAU FRANÇAIS
+        // ============================================================================
+        
+        function createDrapeau() {
+            const group = new THREE.Group();
+            group.position.set(-15, 5, -5);
+            
+            // Mât
+            const matGeometry = new THREE.CylinderGeometry(0.05, 0.05, 10, 16);
+            const matMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x8B4513,
+                metalness: 0.5
+            });
+            const mat = new THREE.Mesh(matGeometry, matMaterial);
+            mat.position.y = 5;
+            group.add(mat);
+            
+            // Drapeau (3 bandes)
+            const bandGeometry = new THREE.BoxGeometry(3, 2, 0.1);
+            
+            // Bleu
+            const bleuMaterial = new THREE.MeshStandardMaterial({ color: 0x002395 });
+            const bleu = new THREE.Mesh(bandGeometry, bleuMaterial);
+            bleu.position.set(0, 7, 0);
+            group.add(bleu);
+            
+            // Blanc
+            const blancMaterial = new THREE.MeshStandardMaterial({ color: 0xFFFFFF });
+            const blanc = new THREE.Mesh(bandGeometry, blancMaterial);
+            blanc.position.set(0, 8.5, 0);
+            group.add(blanc);
+            
+            // Rouge
+            const rougeMaterial = new THREE.MeshStandardMaterial({ color: 0xED2939 });
+            const rouge = new THREE.Mesh(bandGeometry, rougeMaterial);
+            rouge.position.set(0, 10, 0);
+            group.add(rouge);
+            
+            scene.add(group);
+        }
+        
+        // ============================================================================
+        // FOND (nuages)
+        // ============================================================================
+        
+        function createBackground() {
+            // Nuages (sphères blanches semi-transparentes)
+            for (let i = 0; i < 10; i++) {
+                const cloudGeometry = new THREE.SphereGeometry(
+                    2 + Math.random() * 3,
+                    16, 16
+                );
+                const cloudMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0xFFFFFF,
+                    transparent: true,
+                    opacity: 0.3,
+                    roughness: 1
+                });
+                const cloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
+                
+                cloud.position.set(
+                    (Math.random() - 0.5) * 100,
+                    15 + Math.random() * 10,
+                    -50 - Math.random() * 50
+                );
+                
+                scene.add(cloud);
+            }
+        }
+        
+        // ============================================================================
+        // TEXTURE POUR LA PEAU (optionnel)
+        // ============================================================================
+        
+        function createSkinTexture() {
+            // Créer une texture simple pour la peau
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            
+            // Fond
+            ctx.fillStyle = '#FFE4C4';
+            ctx.fillRect(0, 0, 64, 64);
+            
+            // Ajouter des détails (pores)
+            ctx.fillStyle = 'rgba(200,150,100,0.3)';
+            for (let i = 0; i < 50; i++) {
+                const x = Math.random() * 64;
+                const y = Math.random() * 64;
+                const size = 1 + Math.random() * 2;
+                ctx.fillRect(x, y, size, size);
+            }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            return texture;
+        }
+        
+        // ============================================================================
+        // ANIMATION
+        // ============================================================================
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const delta = clock.getDelta();
+            
+            // Animation du bras droit de Macron (mouvement de va-et-vient)
+            if (macron && macron.rightArm) {
+                const time = Date.now() * 0.001;
+                const angle = Math.sin(time * 2) * 0.5; // -0.5 à +0.5 radians
+                macron.rightArm.rotation.z = -Math.PI * 0.2 + angle;
+                macron.rightArm.children[1].rotation.z = angle * 0.5; // Avant-bras
+            }
+            
+            // Animation du public (sauts et agitations)
+            if (publicGroup) {
+                publicGroup.children.forEach(person => {
+                    const data = person.userData;
+                    
+                    // Saut
+                    data.jumpPhase += data.jumpSpeed * delta * 60;
+                    const jumpOffset = Math.sin(data.jumpPhase) * 0.3;
+                    person.position.y = data.originalY + jumpOffset;
+                    
+                    // Agitation des bras
+                    data.armPhase += data.armSpeed * delta * 60;
+                    const armOffset = Math.sin(data.armPhase) * 0.3;
+                    
+                    if (data.leftArm) {
+                        data.leftArm.rotation.z = Math.PI * 0.3 + armOffset;
+                    }
+                    if (data.rightArm) {
+                        data.rightArm.rotation.z = -Math.PI * 0.3 - armOffset;
+                    }
+                    
+                    // Rotation légère du corps
+                    person.rotation.z = armOffset * 0.2;
+                });
+            }
+            
+            // Animation des confettis
+            if (confettiGroup) {
+                confettiGroup.children.forEach(confetti => {
+                    const data = confetti.userData;
+                    
+                    // Déplacement
+                    confetti.position.x += data.speedX;
+                    confetti.position.y += data.speedY;
+                    confetti.position.z += data.speedZ;
+                    
+                    // Rotation
+                    confetti.rotation.x += data.rotationSpeed;
+                    confetti.rotation.y += data.rotationSpeed * 0.5;
+                    
+                    // Réinitialiser si le confetti tombe trop bas
+                    if (confetti.position.y < 0) {
+                        confetti.position.set(
+                            (Math.random() - 0.5) * 40,
+                            15 + Math.random() * 10,
+                            (Math.random() - 0.5) * 40
+                        );
+                    }
+                });
+            }
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        // ============================================================================
+        // GESTION DU REDIMENSIONNEMENT
+        // ============================================================================
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // ============================================================================
+        // DÉMARRAGE
+        // ============================================================================
+        
+        init();
+    </script>
+</body>
+</html>
