@@ -1,0 +1,16 @@
+{
+  "name": "macron-mascot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes serve -l 4321 .",
+    "check": "node scripts/verify.mjs"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "serve": "^14.2.0"
+  }
+}

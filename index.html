@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Coucou — Macron maneki-neko</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #14151f; }
+    #ui {
+      position: fixed; left: 12px; bottom: 12px; z-index: 10;
+      color: #fff; font: 13px/1.5 system-ui, sans-serif;
+      background: rgba(10, 12, 30, 0.55); backdrop-filter: blur(6px);
+      padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15);
+      user-select: none;
+    }
+    #ui button {
+      font: inherit; color: #fff; background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.25); border-radius: 7px;
+      padding: 4px 10px; margin-right: 6px; cursor: pointer;
+    }
+    #ui button:hover { background: rgba(255,255,255,0.22); }
+    #hint { opacity: 0.75; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <button id="btnWave">Vitesse du coucou : normal</button>
+    <button id="btnRotate">Rotation auto : non</button>
+    <div id="hint">Glissez pour tourner autour de l'estrade — molette pour zoomer.</div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./node_modules/three/build/three.module.js",
+      "three/addons/": "./node_modules/three/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ------------------------------------------------------------- Constantes
+    const COLORS = {
+      skin: '#f0c49a', skinDark: '#e2ab7d',
+      hair: '#3d2b1e', brow: '#2e2117',
+      suit: '#1c2c52', suitDark: '#14203e',
+      shirt: '#f4f6fa', tie: '#1f5fbf',
+      gold: '#e8c35a', navy: '#0e1a3a',
+      flagBlue: '#2b4bd7', flagWhite: '#ffffff', flagRed: '#e03',
+      shoe: '#15151a', wood: '#7a5a3a',
+      carpet: '#8e1f35', stage: '#565a6e', dark: '#3c3f52',
+      mouth: '#a13648', iris: '#3f76c9',
+    };
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#181a2e');
+    scene.fog = new THREE.Fog('#181a2e', 14, 34);
+
+    const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 100);
+    camera.position.set(0.6, 2.7, 6.6);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 2.3, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 3.2;
+    controls.maxDistance = 13;
+    controls.maxPolarAngle = 1.42;
+    controls.autoRotateSpeed = 0.7;
+
+    // ---------------------------------------------------------------- Lumières
+    scene.add(new THREE.HemisphereLight('#a8b4ff', '#2c2340', 0.65));
+    const key = new THREE.DirectionalLight('#fff6e6', 1.35);
+    key.position.set(4.5, 8, 5.5);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.camera.left = -7; key.shadow.camera.right = 7;
+    key.shadow.camera.top = 9;   key.shadow.camera.bottom = -3;
+    key.shadow.camera.far = 30;
+    scene.add(key);
+    const spotL = new THREE.SpotLight('#ffe9c9', 55, 25, 0.42, 0.45, 1.6);
+    spotL.position.set(-4.5, 6.5, 4.5); spotL.target.position.set(0, 1.6, 0);
+    scene.add(spotL, spotL.target);
+    const spotR = new THREE.SpotLight('#dce8ff', 45, 25, 0.42, 0.5, 1.6);
+    spotR.position.set(5, 6.5, 3.5); spotR.target.position.set(0, 1.6, 0);
+    scene.add(spotR, spotR.target);
+
+    // ----------------------------------------------------------- Textures canvas
+    function makeCanvas(w, h, draw) {
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      draw(c.getContext('2d'));
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 8;
+      return t;
+    }
+
+    const flagTex = makeCanvas(768, 512, (ctx) => {
+      ctx.fillStyle = COLORS.flagBlue; ctx.fillRect(0, 0, 256, 512);
+      ctx.fillStyle = COLORS.flagWhite; ctx.fillRect(256, 0, 256, 512);
+      ctx.fillStyle = COLORS.flagRed; ctx.fillRect(512, 0, 256, 512);
+    });
+
+    const rosetteTex = makeCanvas(256, 256, (ctx) => {
+      const cols = [COLORS.flagBlue, COLORS.flagWhite, COLORS.flagRed];
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(128, 128);
+        ctx.arc(128, 128, 118, (i * 2 - 1) * Math.PI / 3, ((i + 1) * 2 - 1) * Math.PI / 3);
+        ctx.closePath(); ctx.fillStyle = cols[i]; ctx.fill();
+      }
+      ctx.beginPath(); ctx.arc(128, 128, 118, 0, 7);
+      ctx.lineWidth = 14; ctx.strokeStyle = COLORS.gold; ctx.stroke();
+    });
+
+    const podiumTex = makeCanvas(1024, 680, (ctx) => {
+      ctx.fillStyle = COLORS.navy; ctx.fillRect(0, 0, 1024, 680);
+      ctx.lineWidth = 22; ctx.strokeStyle = COLORS.gold;
+      ctx.strokeRect(40, 40, 944, 600);
+      ctx.fillStyle = COLORS.gold;
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 118px Georgia, serif';
+      ctx.fillText('RÉPUBLIQUE', 512, 268);
+      ctx.fillText('FRANÇAISE', 512, 420);
+      // petit ruban tricolore
+      const cols = [COLORS.flagBlue, COLORS.flagWhite, COLORS.flagRed];
+      cols.forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(332 + i * 120, 480, 120, 34); });
+    });
+
+    const bannerTex = makeCanvas(1024, 256, (ctx) => {
+      ctx.clearRect(0, 0, 1024, 256);
+      ctx.beginPath();
+      ctx.roundRect(10, 24, 1004, 208, 26);
+      ctx.fillStyle = '#fffdf6'; ctx.fill();
+      ctx.lineWidth = 10; ctx.strokeStyle = COLORS.gold; ctx.stroke();
+      ctx.fillStyle = COLORS.navy;
+      ctx.textAlign = 'center';
+      ctx.font = 'italic bold 128px Georgia, serif';
+      ctx.fillText('COUCOU !', 512, 166);
+    });
+
+    // ------------------------------------------------------------- Matériaux
+    const mat = (color, opts = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.62, ...opts });
+    const skinMat = mat(COLORS.skin);
+    const hairMat = mat(COLORS.hair, { roughness: 0.85 });
+    const suitMat = mat(COLORS.suit);
+    const suitDarkMat = mat(COLORS.suitDark);
+    const shirtMat = mat(COLORS.shirt, { roughness: 0.5 });
+    const tieMat = mat(COLORS.tie, { roughness: 0.4 });
+    const goldMat = mat(COLORS.gold, { metalness: 0.65, roughness: 0.3 });
+
+    function addMesh(geo, material, parent, opts = {}) {
+      const m = new THREE.Mesh(geo, material);
+      if (opts.pos) m.position.set(...opts.pos);
+      if (opts.rot) m.rotation.set(...opts.rot);
+      if (opts.scale) m.scale.set(...opts.scale);
+      m.castShadow = opts.cast !== false;
+      m.receiveShadow = true;
+      parent.add(m);
+      return m;
+    }
+
+    // ------------------------------------------------------------------- Sol
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(34, 48), mat('#101120', { roughness: 0.95 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // ---------------------------------------------------------------- Estrade
+    const stage = new THREE.Group();
+    scene.add(stage);
+    addMesh(new THREE.CylinderGeometry(3.3, 3.5, 0.62, 48), mat(COLORS.stage), stage, { pos: [0, 0.31, 0], cast: false });
+    addMesh(new THREE.CylinderGeometry(3.0, 3.0, 0.26, 48), mat(COLORS.dark), stage, { pos: [0, 0.75, 0], cast: false });
+    const carpet = addMesh(new THREE.CylinderGeometry(2.95, 2.95, 0.05, 48), mat(COLORS.carpet, { roughness: 0.9 }), stage, { pos: [0, 0.885, 0], cast: false });
+    addMesh(new THREE.TorusGeometry(2.97, 0.045, 12, 64), goldMat, stage, { pos: [0, 0.89, 0], rot: [Math.PI / 2, 0, 0] });
+    // marches devant l'estrade
+    addMesh(new THREE.BoxGeometry(2.4, 0.2, 0.6), mat(COLORS.dark), stage, { pos: [0, 0.31, 3.55] });
+    addMesh(new THREE.BoxGeometry(2.4, 0.2, 0.6), mat(COLORS.stage), stage, { pos: [0, 0.11, 4.15] });
+
+    // ---------------------------------------------------------------- Drapeaux
+    function makeFlag(x, z, rotY) {
+      const g = new THREE.Group();
+      g.position.set(x, 0, z);
+      g.rotation.y = rotY;
+      addMesh(new THREE.CylinderGeometry(0.035, 0.045, 3.6, 10), mat('#8a8f9e', { metalness: 0.5, roughness: 0.4 }), g, { pos: [0, 1.8, 0] });
+      addMesh(new THREE.SphereGeometry(0.09, 14, 10), goldMat, g, { pos: [0, 3.6, 0] });
+      const flag = addMesh(
+        new THREE.PlaneGeometry(1.6, 1.05),
+        new THREE.MeshStandardMaterial({ map: flagTex, side: THREE.DoubleSide, roughness: 0.8 }),
+        g, { pos: [0.85, 2.95, 0] }
+      );
+      flag.rotation.y = 0.06 * Math.sin(rotY * 3);
+      scene.add(g);
+      return flag;
+    }
+    const flagMeshes = [makeFlag(-3.9, -1.2, 0.55), makeFlag(3.9, -1.2, -0.55)];
+
+    // ------------------------------------------------------------------ Pupitre
+    const podium = new THREE.Group();
+    podium.position.set(0, 0, 0.55);
+    scene.add(podium);
+    addMesh(new THREE.BoxGeometry(1.5, 1.0, 0.72), suitMat, podium, { pos: [0, 1.42, 0] });
+    addMesh(new THREE.BoxGeometry(1.62, 0.09, 0.84), suitDarkMat, podium, { pos: [0, 1.955, 0] });
+    addMesh(new THREE.BoxGeometry(1.66, 0.045, 0.88), goldMat, podium, { pos: [0, 1.915, 0] });
+    const front = addMesh(new THREE.PlaneGeometry(1.28, 0.85),
+      new THREE.MeshStandardMaterial({ map: podiumTex, roughness: 0.55 }),
+      podium, { pos: [0, 1.42, 0.3651], rot: [0, 0, 0], cast: false });
+    front.material.map.center.set(0.5, 0.5);
+    // micro
+    const mic = new THREE.Group();
+    mic.position.set(0.42, 2.0, 0.1);
+    podium.add(mic);
+    const micArm = addMesh(new THREE.CylinderGeometry(0.012, 0.012, 0.42, 8), mat('#555'), mic, { rot: [0.5, 0, 0.35] });
+    micArm.position.set(0, 0.2, 0.05);
+    addMesh(new THREE.SphereGeometry(0.05, 14, 12), mat('#181818', { roughness: 0.35 }), mic, { pos: [-0.075, 0.4, 0.09] });
+
+    // ---------------------------------------------------------- Bandeau "COUCOU !"
+    const banner = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.5, 0.875),
+      new THREE.MeshStandardMaterial({ map: bannerTex, transparent: true, roughness: 0.7, side: THREE.DoubleSide })
+    );
+    banner.position.set(0, 3.7, -2.3);
+    banner.rotation.x = -0.06;
+    scene.add(banner);
+
+    // --------------------------------------------------------------- Personnage
+    const character = new THREE.Group();
+    character.position.set(0, 0.91, -0.15);
+    scene.add(character);
+
+    // Jambes + chaussures
+    [-0.13, 0.13].forEach((x) => {
+      addMesh(new THREE.CylinderGeometry(0.085, 0.1, 0.56, 14), suitDarkMat, character, { pos: [x, 0.28, 0.02] });
+      addMesh(new THREE.BoxGeometry(0.17, 0.085, 0.3), mat(COLORS.shoe, { roughness: 0.35 }), character, { pos: [x, 0.042, 0.08] });
+    });
+
+    // Torse (costume)
+    const torso = new THREE.Group();
+    torso.position.y = 0.56;
+    character.add(torso);
+    const torsoMesh = addMesh(new THREE.CylinderGeometry(0.21, 0.17, 0.6, 20), suitMat, torso, { pos: [0, 0.3, 0], scale: [1, 1, 0.78] });
+    // chemise en V
+    addMesh(new THREE.CylinderGeometry(0.075, 0.11, 0.3, 12), shirtMat, torso, { pos: [0, 0.42, 0.135], scale: [1, 1, 0.35] });
+    addMesh(new THREE.ConeGeometry(0.105, 0.16, 12), suitMat, torso, { pos: [0, 0.5, 0.125], scale: [1, 1, 0.25], rot: [Math.PI, 0, 0] });
+    // revers du costume
+    [-0.075, 0.075].forEach((x) => {
+      addMesh(new THREE.BoxGeometry(0.055, 0.26, 0.03), suitDarkMat, torso, { pos: [x * 1.7, 0.475, 0.155], rot: [0, x > 0 ? -0.25 : 0.25, x > 0 ? 0.22 : -0.22] });
+    });
+    // cravate
+    const tie = new THREE.Group();
+    tie.position.set(0, 0.5, 0.16);
+    torso.add(tie);
+    addMesh(new THREE.BoxGeometry(0.075, 0.09, 0.022), tieMat, tie, { pos: [0, -0.02, 0.01], rot: [0.15, 0, 0] });
+    addMesh(new THREE.ConeGeometry(0.05, 0.26, 10), tieMat, tie, { pos: [0, -0.2, 0.035], rot: [0.18, Math.PI, 0] });
+    // rosette tricolore
+    const rosette = addMesh(new THREE.CylinderGeometry(0.052, 0.052, 0.012, 24),
+      new THREE.MeshStandardMaterial({ map: rosetteTex, roughness: 0.5 }),
+      torso, { pos: [-0.135, 0.5, 0.165], rot: [Math.PI / 2, 0, 0] });
+    addMesh(new THREE.SphereGeometry(0.05, 10, 8), mat('#c9a03a', { metalness: 0.6, roughness: 0.35 }), rosette, { pos: [0, -0.09, 0] });
+    // boutons dorés
+    [-0.16, 0.16].forEach((x) => {
+      addMesh(new THREE.SphereGeometry(0.018, 10, 8), goldMat, torso, { pos: [x * 1.35, 0.22, 0.145] });
+    });
+
+    // -------------------------------------------------- Bras (pivots à l'épaule)
+    function makeArm(side) {           // side: +1 bras qui fait coucou, -1 bras au repos
+      const shoulder = new THREE.Group();
+      shoulder.position.set(side * 0.235, 0.545, 0.05);
+      torso.add(shoulder);
+      // épaule arrondie
+      addMesh(new THREE.SphereGeometry(0.075, 14, 12), suitMat, shoulder, { pos: [0, 0.02, 0] });
+      addMesh(new THREE.CylinderGeometry(0.055, 0.05, 0.36, 12), suitMat, shoulder, { pos: [0, -0.19, 0] });
+      const elbow = new THREE.Group();
+      elbow.position.set(0, -0.37, 0);
+      shoulder.add(elbow);
+      addMesh(new THREE.SphereGeometry(0.056, 12, 10), suitMat, elbow, { pos: [0, 0, 0] });
+      addMesh(new THREE.CylinderGeometry(0.048, 0.045, 0.3, 12), suitMat, elbow, { pos: [0, -0.16, 0] });
+      // poignet chemise
+      addMesh(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 12), shirtMat, elbow, { pos: [0, -0.3, 0] });
+      const hand = new THREE.Group();
+      hand.position.set(0, -0.35, 0);
+      elbow.add(hand);
+      const palm = addMesh(new THREE.SphereGeometry(0.062, 14, 12), skinMat, hand, { scale: [1.15, 0.75, 0.55] });
+      if (side > 0) {  // main ouverte qui fait coucou : petits doigts
+        for (let i = 0; i < 4; i++) {
+          addMesh(new THREE.SphereGeometry(0.026, 10, 8), skinMat, hand,
+            { pos: [-0.075 + i * 0.05, 0.052, 0.01] });
+        }
+        addMesh(new THREE.SphereGeometry(0.024, 10, 8), skinMat, hand, { pos: [0.09, 0.01, 0] });
+      }
+      return { shoulder, elbow, hand, palm };
+    }
+    const waveArm = makeArm(+1);
+    const restArm = makeArm(-1);
+
+    // ------------------------------------------------------------------- Tête
+    const neck = new THREE.Group();
+    neck.position.set(0, 0.62, 0);
+    torso.add(neck);
+    addMesh(new THREE.CylinderGeometry(0.065, 0.075, 0.14, 14), skinMat, neck, { pos: [0, 0.05, 0] });
+
+    const head = new THREE.Group();
+    head.position.set(0, 0.16, 0);
+    neck.add(head);
+
+    const skull = addMesh(new THREE.SphereGeometry(0.3, 32, 24), skinMat, head, { pos: [0, 0.07, 0], scale: [0.9, 1.04, 0.94] });
+
+    // cheveux : calotte + mèche balayée + pattes
+    const hairCap = addMesh(new THREE.SphereGeometry(0.305, 28, 18, 0, Math.PI * 2, 0, Math.PI * 0.52),
+      hairMat, head, { pos: [0, 0.085, -0.01], rot: [-0.12, 0, -0.1], scale: [1.02, 1.0, 1.02] });
+    const quiff = addMesh(new THREE.TorusGeometry(0.13, 0.05, 10, 22, Math.PI * 1.05),
+      hairMat, head, { pos: [0.07, 0.345, 0.1], rot: [1.35, 0.15, -0.5] });
+    addMesh(new THREE.SphereGeometry(0.055, 12, 10), hairMat, head, { pos: [-0.24, 0.06, 0], scale: [0.45, 1.1, 0.85] });
+    addMesh(new THREE.SphereGeometry(0.055, 12, 10), hairMat, head, { pos: [0.24, 0.06, 0], scale: [0.45, 1.1, 0.85] });
+
+    // oreilles
+    addMesh(new THREE.SphereGeometry(0.05, 12, 10), skinMat, head, { pos: [-0.265, 0.05, 0.01], scale: [0.5, 1, 0.8] });
+    addMesh(new THREE.SphereGeometry(0.05, 12, 10), skinMat, head, { pos: [0.265, 0.05, 0.01], scale: [0.5, 1, 0.8] });
+
+    // sourcils
+    addMesh(new THREE.BoxGeometry(0.115, 0.02, 0.024), mat(COLORS.brow), head, { pos: [-0.105, 0.155, 0.275], rot: [0, 0.12, -0.16] });
+    addMesh(new THREE.BoxGeometry(0.115, 0.02, 0.024), mat(COLORS.brow), head, { pos: [0.105, 0.155, 0.275], rot: [0, -0.12, 0.16] });
+
+    // yeux (avec cil/paupérie intégrés dans le groupe pour cligner)
+    const eyes = new THREE.Group();
+    head.add(eyes);
+    [-0.1, 0.1].forEach((x) => {
+      const eye = new THREE.Group();
+      eye.position.set(x, 0.075, 0.262);
+      eyes.add(eye);
+      addMesh(new THREE.SphereGeometry(0.05, 16, 12), mat('#ffffff', { roughness: 0.25 }), eye, { scale: [1, 0.88, 0.62] });
+      addMesh(new THREE.SphereGeometry(0.024, 12, 10), mat(COLORS.iris, { roughness: 0.3 }), eye, { pos: [0, 0, 0.031] });
+      addMesh(new THREE.SphereGeometry(0.012, 10, 8), mat('#101010', { roughness: 0.2 }), eye, { pos: [0, 0, 0.045] });
+    });
+
+    // nez
+    addMesh(new THREE.SphereGeometry(0.043, 14, 12), mat(COLORS.skinDark), head,
+      { pos: [0, -0.005, 0.27], scale: [0.72, 1.25, 0.95] });
+
+    // sourire
+    const smile = addMesh(new THREE.TorusGeometry(0.078, 0.016, 10, 24, Math.PI),
+      mat(COLORS.mouth, { roughness: 0.5 }), head, { pos: [0, -0.115, 0.235], rot: [0.08, 0, Math.PI] });
+    addMesh(new THREE.SphereGeometry(0.03, 10, 8), mat(COLORS.mouth), head, { pos: [-0.078, -0.117, 0.235] });
+    addMesh(new THREE.SphereGeometry(0.03, 10, 8), mat(COLORS.mouth), head, { pos: [0.078, -0.117, 0.235] });
+    // menton
+    addMesh(new THREE.SphereGeometry(0.05, 12, 10), skinMat, head, { pos: [0, -0.19, 0.21], scale: [1.1, 0.7, 0.8] });
+
+    // ---------------------------------------------------------------- Confettis
+    const CONFETTI_N = 260;
+    const confCols = [new THREE.Color(COLORS.flagBlue), new THREE.Color('#f5b81c'),
+                      new THREE.Color(COLORS.flagRed), new THREE.Color('#ffffff')];
+    const cGeo = new THREE.BufferGeometry();
+    const cPos = new Float32Array(CONFETTI_N * 3);
+    const cCol = new Float32Array(CONFETTI_N * 3);
+    const cSpeed = new Float32Array(CONFETTI_N);
+    for (let i = 0; i < CONFETTI_N; i++) {
+      cPos[i * 3] = (Math.random() - 0.5) * 9;
+      cPos[i * 3 + 1] = 0.3 + Math.random() * 7;
+      cPos[i * 3 + 2] = (Math.random() - 0.5) * 8;
+      const c = confCols[i % confCols.length];
+      cCol[i * 3] = c.r; cCol[i * 3 + 1] = c.g; cCol[i * 3 + 2] = c.b;
+      cSpeed[i] = 0.35 + Math.random() * 0.5;
+    }
+    cGeo.setAttribute('position', new THREE.BufferAttribute(cPos, 3));
+    cGeo.setAttribute('color', new THREE.BufferAttribute(cCol, 3));
+    const confetti = new THREE.Points(cGeo,
+      new THREE.PointsMaterial({ size: 0.075, vertexColors: true, transparent: true, opacity: 0.9 }));
+    scene.add(confetti);
+
+    // -------------------------------------------------------------- Interactions
+    let waveSpeed = 1, autoRotate = false;
+    document.getElementById('btnWave').addEventListener('click', (e) => {
+      waveSpeed = waveSpeed === 1 ? 1.8 : (waveSpeed === 1.8 ? 0.45 : 1);
+      e.target.textContent = `Vitesse du coucou : ${waveSpeed === 1.8 ? 'rapide' : waveSpeed === 0.45 ? 'paresseux' : 'normal'}`;
+    });
+    document.getElementById('btnRotate').addEventListener('click', (e) => {
+      autoRotate = !autoRotate;
+      controls.autoRotate = autoRotate;
+      e.target.textContent = `Rotation auto : ${autoRotate ? 'oui' : 'non'}`;
+    });
+
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    // -------------------------------------------------------------- Boucle anim
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const t = clock.elapsedTime;
+      const w = t * 4.6 * waveSpeed;          // phase du coucou
+
+      // Bras qui fait coucou (style maneki-neko) : bras levé, avant-bras qui oscille
+      waveArm.shoulder.rotation.z = 2.32 + Math.sin(w) * 0.06;
+      waveArm.shoulder.rotation.x = -0.25;
+      waveArm.elbow.rotation.z = -0.62 + Math.sin(w) * 0.5;
+      waveArm.hand.rotation.z = 0.35 + Math.sin(w + 0.4) * 0.35;
+
+      // Bras au repos, légère balancelle
+      restArm.shoulder.rotation.z = -0.16 + Math.sin(t * 1.2) * 0.04;
+      restArm.shoulder.rotation.x = -0.12 + Math.sin(t * 1.4) * 0.05;
+      restArm.elbow.rotation.z = -0.4;
+      restArm.hand.position.y = -0.35 + Math.sin(t * 1.6) * 0.006;
+
+      // Tête : hoche, regarde autour, rebondit au rythme du coucou
+      head.rotation.y = Math.sin(t * 0.85) * 0.12;
+      head.rotation.x = 0.045 * Math.sin(t * 0.7) + 0.02;
+      head.rotation.z = 0.045 * Math.sin(w);
+      head.position.y = 0.16 + 0.012 * Math.abs(Math.sin(w));
+
+      // Clignement des yeux toutes les ~3,4 s
+      const bt = t % 3.4;
+      let sy = 1;
+      if (bt > 3.18) {
+        const p = (bt - 3.18) / 0.22;
+        sy = Math.max(0.08, Math.abs(Math.cos(p * Math.PI)));
+      }
+      eyes.scale.y = sy;
+
+      // Sourire qui pulse doucement avec la salutation
+      smile.scale.setScalar(1 + 0.07 * Math.max(0, Math.sin(w)));
+      smile.position.y = -0.115 + 0.006 * Math.max(0, Math.sin(w));
+
+      // Corps : léger rebond maneki-neko
+      character.position.y = 0.91 + 0.02 * Math.abs(Math.sin(w));
+      torso.rotation.z = 0.025 * Math.sin(w);
+
+      // Micro qui oscille à peine
+      mic.rotation.x = 0.03 * Math.sin(t * 2.1);
+
+      // Drapeaux et bannière qui ondulent
+      flagMeshes.forEach((f, i) => { f.rotation.y = 0.07 * Math.sin(t * 1.7 + i * 2); });
+      banner.position.y = 3.7 + 0.05 * Math.sin(t * 1.1);
+      banner.rotation.z = 0.015 * Math.sin(t * 0.9);
+
+      // Confettis qui tombent
+      const pos = confetti.geometry.attributes.position;
+      for (let i = 0; i < CONFETTI_N; i++) {
+        let y = pos.getY(i) - cSpeed[i] * dt * (0.6 + waveSpeed * 0.4);
+        let x = pos.getX(i) + Math.sin(t * 1.5 + i) * dt * 0.25;
+        if (y < 0.15) { y = 7 + Math.random(); x = (Math.random() - 0.5) * 9; }
+        pos.setY(i, y); pos.setX(i, x);
+      }
+      pos.needsUpdate = true;
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
